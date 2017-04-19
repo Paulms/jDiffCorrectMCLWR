@@ -67,7 +67,7 @@ end
 
 function cdt(u::AbstractArray, CFL, dx)
   maxρ = 0
-  maxρβ = 0
+  maxρB = 0
   N = size(u,1)
   for i in 1:N
     maxρ = max(maxρ, maximum(fluxρ(u[i,:])))
@@ -121,7 +121,7 @@ function update_KT1(rhs, uold, N, M, dx, boundary)
   # Diffusion
   pp = zeros(N-1,M)
   for j = 1:N-1
-    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:])).*∇u_ap[j,:]
+    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]'
   end
   hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
   if boundary == PERIODIC
@@ -225,7 +225,7 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   # Diffusion
   pp = zeros(N-1,M)
   for j = 1:N-1
-    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:])).*∇u_ap[j,:]
+    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]'
   end
   hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
   if boundary == PERIODIC
