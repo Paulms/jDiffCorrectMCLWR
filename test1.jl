@@ -4,7 +4,6 @@ const Tend = 0.2
 const L = 10.0 #mi
 const ϕc = exp(-7/e)
 
-
 #Functions:
 Flux(ϕ::Vector) = VV(sum(ϕ))*ϕ.*Vmax
 function BB(ϕ::Vector)
@@ -49,8 +48,9 @@ dx, xx, uinit = setup_initial(N,M)
 const Vmax = [60,55,50,45]
 const Lmin = [0.03,0.03,0.03,0.03]
 const τ = [0.0013,0.0011,0.0008,0.0006]
-@time uu =  KT(uinit,dx,CFL,N,M,Tend, TVD_RK2, PERIODIC)
+@time uu =  KT(uinit,dx,CFL,Tend, TVD_RK2, PERIODIC)
 
 #Plot
 using(Plots)
 plot(xx, uinit, line=(:dot,2))
+plot(xx, uu, line=(:dot,2))

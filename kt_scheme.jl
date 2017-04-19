@@ -8,7 +8,7 @@ function KT(uinit::AbstractArray,dx,CFL,Tend,tempSteps = FORWARD_EULER, boundary
   #Print progress
   percentage = 0
   limit = Tend/5
-  println("Starting KT scheme")
+  println("Starting KT scheme...")
   t = 0.0
   M = size(uinit,2)
   N = size(uinit,1)
@@ -20,21 +20,21 @@ function KT(uinit::AbstractArray,dx,CFL,Tend,tempSteps = FORWARD_EULER, boundary
     uold = copy(uu)
     dt = cdt(uold, CFL, dx)
     if (tempSteps == FORWARD_EULER)
-      update_KT(rhs1, uold, N, M, dx, Θ, boundary, order)
+      update_KT(rhs1, uold, N, M, dx, dt,Θ, boundary, order)
       uu = uold + dt*rhs1
     elseif (tempSteps == TVD_RK2)
       #FIRST Step
-      update_KT(rhs1, uold, N, M, dx, Θ, boundary, order)
+      update_KT(rhs1, uold, N, M, dx, dt,Θ, boundary, order)
       #Second Step
-      update_KT(rhs2, uold+dt*rhs1, N, M,dx, Θ, boundary, order)
+      update_KT(rhs2, uold+dt*rhs1, N, M,dx, dt,Θ, boundary, order)
       uu = 0.5*(uold + uold + dt*rhs1 + dt*rhs2)
     elseif (tempSteps == RK4)
       #FIRST Step
-      update_KT(rhs1, uold, N, M,dx, boundary)
+      update_KT(rhs1, uold, N, M,dx, Θ, boundary, order)
       #Second Step
-      update_KT(rhs2, uold+dt/2*rhs1, N, M,dx, Θ, boundary, order)
+      update_KT(rhs2, uold+dt/2*rhs1, N, M,dx, dt,Θ, boundary, order)
       #Third Step
-      update_KT(rhs3, uold+dt/2*rhs2, N, M,dx, Θ, boundary, order)
+      update_KT(rhs3, uold+dt/2*rhs2, N, M,dx, dt,Θ, boundary, order)
       #Fourth Step
       update_KT(rhs4, uold+dt*rhs3, N, M,dx, dt, Θ, boundary, order)
       uu = uold + dt/6 * (rhs1+2*rhs2+2*rhs3+rhs4)
@@ -62,7 +62,7 @@ end
 #Flux must be like flux(x::Vector) = x.^2
 Jf = x -> ForwardDiff.jacobian(Flux,x)
 function fluxρ(uj::Vector)
-  abs(eigvals(Jf(uj)))
+  maximum(abs(eigvals(Jf(uj))))
 end
 
 function cdt(u::AbstractArray, CFL, dx)
@@ -70,7 +70,7 @@ function cdt(u::AbstractArray, CFL, dx)
   maxρB = 0
   N = size(u,1)
   for i in 1:N
-    maxρ = max(maxρ, maximum(fluxρ(u[i,:])))
+    maxρ = max(maxρ, fluxρ(u[i,:]))
     maxρB = max(maxρB, maximum(abs(eigvals(BB(u[i,:])))))
   end
   CFL/(1/dx*maxρ+1/(2*dx^2)*maxρB)
@@ -108,8 +108,9 @@ function update_KT1(rhs, uold, N, M, dx, boundary)
   end
   uplus = uold[2:N,:] - dx/2*∇u[2:N,:]
   uminus = uold[1:N-1,:] + dx/2*∇u[1:N-1,:]
+  aa = zeros(N-1)
   for j = 1:(N-1)
-    aa[j]=max(fluxρ(uminus[j,:]),fluxρ(uplus[j,:]))
+    aa[j]=max.(fluxρ(uminus[j,:]),fluxρ(uplus[j,:]))
   end
 
   # Numerical Fluxes
@@ -121,7 +122,7 @@ function update_KT1(rhs, uold, N, M, dx, boundary)
   # Diffusion
   pp = zeros(N-1,M)
   for j = 1:N-1
-    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]'
+    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]
   end
   hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
   if boundary == PERIODIC
@@ -164,6 +165,7 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   # Local speeds of propagation
   uminus = uold[1:N-1,:]+0.5*∇u[1:N-1,:]
   uplus = uold[2:N,:]-0.5*∇u[2:N,:]
+  aa = zeros(N-1)
   for j = 1:(N-1)
     aa[j]=max(fluxρ(uminus[j,:]),fluxρ(uplus[j,:]))
   end
@@ -218,14 +220,14 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   # Numerical Fluxes
   hh = zeros(N-1,M)
   for j = 1:(N-1)
-    hh[j] = 0.5*(Flux(Φ_r[j,:])+Flux(Φ_l[j,:]))-0.5*(uold[j+1,:]-uold[j,:])*aa[j]+
+    hh[j,:] = 0.5*(Flux(Φ_r[j,:])+Flux(Φ_l[j,:]))-0.5*(uold[j+1,:]-uold[j,:])*aa[j]+
     aa[j]*(1-λ*aa[j])/4*(∇u[j+1,:]+∇u[j,:]) + λ*dx/2*(aa[j])^2*∇Ψ[j,:]
   end
   ∇u_ap = (uold[2:N,:]-uold[1:N-1,:])/dx
   # Diffusion
   pp = zeros(N-1,M)
   for j = 1:N-1
-    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]'
+    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]
   end
   hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
   if boundary == PERIODIC
