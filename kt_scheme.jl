@@ -90,34 +90,57 @@ function minmod(a,b)
 end
 
 function update_KT1(rhs, uold, N, M, dx, boundary)
-  ∇u = zeros(N)
-  for j = 2:N-1
-    ∇u[j] = minmod((uold[j] - uold[j-1])/dx,(uold[j+1] - uold[j])/dx)
+  # Impose boundary condition
+  ss = 0
+  if boundary == PERIODIC
+    ss = 1
+    N = N + 2   #Create ghost cells
+    utemp = copy(uold)
+    uold = zeros(N,M)
+    uold[2:N-1,:] = utemp
+    uold[1,:] = utemp[N-2,:]
+    uold[N,:] = utemp[1,:]
   end
-  uplus = uold[2:N] - dx/2*∇u[2:N]
-  uminus = uold[1:N-1] + dx/2*∇u[1:N-1]
-  Jf = x -> ForwardDiff.derivative(Flux,x)
-  aa = max.(abs(Jf.(uplus)),abs(Jf.(uminus)))
+  # Slope vector
+  ∇u = zeros(N,M)
+  for j = 2:N-1
+    ∇u[j,:] = minmod.((uold[j,:] - uold[j-1,:])/dx,(uold[j+1,:] - uold[j,:])/dx)
+  end
+  uplus = uold[2:N,:] - dx/2*∇u[2:N,:]
+  uminus = uold[1:N-1,:] + dx/2*∇u[1:N-1,:]
+  for j = 1:(N-1)
+    aa[j]=max(fluxρ(uminus[j,:]),fluxρ(uplus[j,:]))
+  end
 
   # Numerical Fluxes
-  hh = zeros(N-1)
-  hh = 0.5*(Flux.(uplus)+Flux.(uminus))-0.5*(aa.*(uplus-uminus))
-  ∇u_ap = (uold[2:N]-uold[1:N-1])/dx
-  KK = map(kk, uold)
-  pp = 0.5*(KK[1:N-1].*∇u_ap + KK[2:N].*∇u_ap)
-  j = 1
-  rhs[j] = - 1/dx * (hh[j] - pp[j])
-  for j = 2:(N-1)
-    rhs[j] = - 1/dx * (hh[j]-hh[j-1]-(pp[j]-pp[j-1]))
+  hh = zeros(N-1,M)
+  for j = 1:N-1
+    hh[j,:] = 0.5*(Flux(uplus[j,:])+Flux(uminus[j,:]))-0.5*(aa[j]*(uplus[j]-uminus[j]))
   end
-  j = N
-  rhs[j] = - 1/dx *(-hh[j-1]+pp[j-1])
+  ∇u_ap = (uold[2:N,:]-uold[1:N-1,:])/dx
+  # Diffusion
+  pp = zeros(N-1,M)
+  for j = 1:N-1
+    pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:])).*∇u_ap[j,:]
+  end
+  hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
+  if boundary == PERIODIC
+    hhleft = hh[1]; ppleft = pp[1]
+    hhright = hh[N]; ppright = pp[N]
+  end
+
+  j = 1 + ss
+  rhs[j-ss] = - 1/dx * (hh[j] -hhleft - (pp[j]-ppleft))
+  for j = (2+ss):(N-1-ss)
+    rhs[j-ss] = - 1/dx * (hh[j]-hh[j-1]-(pp[j]-pp[j-1]))
+  end
+  j = N-ss
+  rhs[j-ss] =  -1/dx*(hhright-hh[j-1]-(ppright - pp[j-1]))
 end
 
 
 function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   ss = 0
-
   if boundary == PERIODIC
     ss = 1
     N = N + 2   #Create ghost cells
@@ -199,7 +222,7 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
     aa[j]*(1-λ*aa[j])/4*(∇u[j+1,:]+∇u[j,:]) + λ*dx/2*(aa[j])^2*∇Ψ[j,:]
   end
   ∇u_ap = (uold[2:N,:]-uold[1:N-1,:])/dx
-  #pp = 0.5*(KK[1:N-1].*∇u_ap + KK[2:N].*∇u_ap)
+  # Diffusion
   pp = zeros(N-1,M)
   for j = 1:N-1
     pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:])).*∇u_ap[j,:]
