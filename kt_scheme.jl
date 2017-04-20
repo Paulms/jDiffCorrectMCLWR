@@ -111,7 +111,7 @@ function update_KT1(rhs, uold, N, M, dx, boundary)
   uminus = uold[1:N-1,:] + dx/2*∇u[1:N-1,:]
   aa = zeros(N-1)
   for j = 1:(N-1)
-    aa[j]=max.(fluxρ(uminus[j,:]),fluxρ(uplus[j,:]))
+    aa[j]=max(fluxρ(uminus[j,:]),fluxρ(uplus[j,:]))
   end
 
   # Numerical Fluxes
