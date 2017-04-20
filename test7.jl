@@ -4,7 +4,7 @@
 # and mechanics, 2013
 
 # Parameters:
-const CFL = 0.1
+const CFL = 0.6
 const Tend = 0.1
 const L = 4.0 #mi
 const ϕc = exp(-7/e)
@@ -59,15 +59,17 @@ end
 #Run Test
 include("kt_scheme.jl")
 const M = 2
-const N = 1000
+const N = 500
 dx, xx, uinit = setup_initial(N,M)
 const Vmax = [80.0,30.0]
 const Lmin = [0.01,0.01]
 const τ = [0.00095,0.00075]
-@time uu =  KT(uinit,dx,CFL,Tend, TVD_RK2, PERIODIC)
+@time uu = KT(uinit,dx,CFL,Tend, TVD_RK2, PERIODIC)
+@time uu2 = KT(uinit,dx,CFL,Tend, TVD_RK2, PERIODIC, 1,1)
 
 #Plot
 using(Plots)
 plot(xx, uinit, line=(:dot,2))
-plot(xx, uu[:,1], line=(:dot,2))
+plot(xx, uu[:,2], line=(:doxt,2))
+plot(xx, uu2[:,2], line=(:doxt,2))
 plot!(xx, [sum(uu[i,:]) for i=1:N],lab="ϕ")

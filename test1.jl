@@ -33,8 +33,8 @@ function BB(ϕ::Vector)
     B
   end
 end
-VV(ϕ) = (sum(ϕ) < ϕc) ? 1.0 : -e/7*log(ϕ)
-VP(ϕ) = (sum(ϕ) < ϕc) ? 0.0 : -e/7*1/ϕ
+VV(ϕ) = (ϕ < ϕc) ? 1.0 : -e/7*log(ϕ)
+VP(ϕ) = (ϕ < ϕc) ? 0.0 : -e/7*1/ϕ
 #Setup initial Conditions
 function setup_initial(N,M)
   # We use ghost cells
