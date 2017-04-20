@@ -62,7 +62,8 @@ end
 #Flux must be like flux(x::Vector) = x.^2
 Jf = x -> ForwardDiff.jacobian(Flux,x)
 function fluxρ(uj::Vector)
-  maximum(abs(eigvals(Jf(uj))))
+  #maximum(abs(eigvals(Jf(uj))))
+  maximum(abs(eigvals(JacF(uj))))
 end
 
 function cdt(u::AbstractArray, CFL, dx)
@@ -126,17 +127,17 @@ function update_KT1(rhs, uold, N, M, dx, boundary)
   end
   hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
   if boundary == PERIODIC
-    hhleft = hh[1]; ppleft = pp[1]
-    hhright = hh[N]; ppright = pp[N]
+    hhleft = hh[1,:]; ppleft = pp[1,:]
+    hhright = hh[N-1,:]; ppright = pp[N-1,:]
   end
 
   j = 1 + ss
-  rhs[j-ss] = - 1/dx * (hh[j] -hhleft - (pp[j]-ppleft))
+  rhs[j-ss,:] = - 1/dx * (hh[j,:] -hhleft - (pp[j,:]-ppleft))
   for j = (2+ss):(N-1-ss)
-    rhs[j-ss] = - 1/dx * (hh[j]-hh[j-1]-(pp[j]-pp[j-1]))
+    rhs[j-ss,:] = - 1/dx * (hh[j,:]-hh[j-1,:]-(pp[j,:]-pp[j-1,:]))
   end
   j = N-ss
-  rhs[j-ss] =  -1/dx*(hhright-hh[j-1]-(ppright - pp[j-1]))
+  rhs[j-ss,:] =  -1/dx*(hhright-hh[j-1,:]-(ppright - pp[j-1,:]))
 end
 
 
@@ -183,10 +184,10 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   ∇f_r = zeros(N-1,M)
 
   for j = 2:(N-2)
-    ∇f_l[j,:] = minmod.(Θ*(Flux(u_l[j,:])-Flux(u_l[j-1,:])),(Flux(u_l[j+1,:])-Flux(u_l[j-1,:]))/2,
-    Θ*(Flux(u_l[j+1,:])-Flux(u_l[j,:])))
-    ∇f_r[j,:] = minmod.(Θ*(Flux(u_r[j,:])-Flux(u_r[j-1,:])),(Flux(u_r[j+1,:])-Flux(u_r[j-1,:]))/2,
-    Θ*(Flux(u_r[j+1,:])-Flux(u_r[j,:])))
+    Ful = Flux(u_l[j,:]); Fulm = Flux(u_l[j-1,:]); Fulp = Flux(u_l[j+1,:])
+    ∇f_l[j,:] = minmod.(Θ*(Ful-Fulm),(Fulp-Fulm)/2,Θ*(Fulp-Ful))
+    Fur = Flux(u_r[j,:]); Furm = Flux(u_r[j-1,:]); Furp = Flux(u_r[j+1,:])
+    ∇f_r[j,:] = minmod.(Θ*(Fur-Furm),(Furp-Furm)/2,Θ*(Furp-Fur))
   end
 
   # Predictor solution values
@@ -196,17 +197,21 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   # Aproximate cell averages
   Ψr = zeros(N-1,M)
   Ψ = zeros(N,M)
+  FΦr = zeros(N-1,M)
+  FΦl = zeros(N-1,M)
   for j = 1:(N-1)
     if (aa[j] != 0)
+      FΦr[j,:] = Flux(Φ_r[j,:])
+      FΦl[j,:] = Flux(Φ_l[j,:])
       Ψr[j,:] = 0.5*(uold[j,:]+uold[j+1,:])+(1-λ*aa[j])/4*(∇u[j,:]-∇u[j+1,:])-1/(2*aa[j])*
-      (Flux(Φ_r[j,:])-Flux(Φ_l[j,:]))
+      (FΦr[j,:]-FΦl[j,:])
     else
       Ψr[j,:] = 0.5*(uold[j,:]+uold[j+1,:])
     end
   end
   for j = 2:(N-1)
     Ψ[j,:] = uold[j,:] - λ/2*(aa[j]-aa[j-1])*∇u[j,:]-λ/(1-λ*(aa[j]+aa[j-1]))*
-    (Flux(Φ_l[j,:])-Flux(Φ_r[j-1,:]))
+    (FΦl[j,:]-FΦr[j-1,:])
   end
 
   # Discrete derivatives
@@ -220,7 +225,7 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   # Numerical Fluxes
   hh = zeros(N-1,M)
   for j = 1:(N-1)
-    hh[j,:] = 0.5*(Flux(Φ_r[j,:])+Flux(Φ_l[j,:]))-0.5*(uold[j+1,:]-uold[j,:])*aa[j]+
+    hh[j,:] = 0.5*(FΦr[j,:]+FΦl[j,:])-0.5*(uold[j+1,:]-uold[j,:])*aa[j]+
     aa[j]*(1-λ*aa[j])/4*(∇u[j+1,:]+∇u[j,:]) + λ*dx/2*(aa[j])^2*∇Ψ[j,:]
   end
   ∇u_ap = (uold[2:N,:]-uold[1:N-1,:])/dx
@@ -231,14 +236,14 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   end
   hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
   if boundary == PERIODIC
-    hhleft = hh[1]; ppleft = pp[1]
-    hhright = hh[N]; ppright = pp[N]
+    hhleft = hh[1,:]; ppleft = pp[1,:]
+    hhright = hh[N-1,:]; ppright = pp[N-1,:]
   end
   j = 1 + ss
-  rhs[j-ss] = - 1/dx * (hh[j] -hhleft - (pp[j]-ppleft))
+  rhs[j-ss,:] = - 1/dx * (hh[j,:] -hhleft - (pp[j,:]-ppleft))
   for j = (2+ss):(N-1-ss)
-    rhs[j-ss] = - 1/dx * (hh[j]-hh[j-1]-(pp[j]-pp[j-1]))
+    rhs[j-ss,:] = - 1/dx * (hh[j,:]-hh[j-1,:]-(pp[j,:]-pp[j-1,:]))
   end
   j = N-ss
-  rhs[j-ss] =  -1/dx*(hhright-hh[j-1]-(ppright - pp[j-1]))
+  rhs[j-ss,:] =  -1/dx*(hhright-hh[j-1,:]-(ppright - pp[j-1,:]))
 end
