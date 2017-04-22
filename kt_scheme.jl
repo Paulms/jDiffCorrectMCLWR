@@ -217,9 +217,9 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   # Discrete derivatives
   ∇Ψ = zeros(N-1,M)
   for j = 2:(N-2)
-    ∇Ψ[j,:]=2/dx*minmod.(Θ*(Φ_r[j,:]-Ψ[j,:])/(1+λ*(aa[j]-aa[j-1])),
+    ∇Ψ[j,:]=2/dx*minmod.(Θ*(Ψr[j,:]-Ψ[j,:])/(1+λ*(aa[j]-aa[j-1])),
     (Ψ[j+1,:]-Ψ[j,:])/(2+λ*(2*aa[j]-aa[j-1]-aa[j+1])),
-    Θ*(Ψ[j+1,:]-Φ_r[j,:])/(1+λ*(aa[j]-aa[j+1])))
+    Θ*(Ψ[j+1,:]-Ψr[j,:])/(1+λ*(aa[j]-aa[j+1])))
   end
 
   # Numerical Fluxes
