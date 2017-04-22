@@ -228,7 +228,7 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
     hh[j,:] = 0.5*(FΦr[j,:]+FΦl[j,:])-0.5*(uold[j+1,:]-uold[j,:])*aa[j]+
     aa[j]*(1-λ*aa[j])/4*(∇u[j+1,:]+∇u[j,:]) + λ*dx/2*(aa[j])^2*∇Ψ[j,:]
   end
-  ∇u_ap = (uold[2:N,:]-uold[1:N-1,:])/dx
+  ∇u_ap = ∇u/dx#(uold[2:N,:]-uold[1:N-1,:])/dx
   # Diffusion
   pp = zeros(N-1,M)
   for j = 1:N-1
