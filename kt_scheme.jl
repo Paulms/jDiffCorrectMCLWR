@@ -30,7 +30,7 @@ function KT(uinit::AbstractArray,dx,CFL,Tend,tempSteps = FORWARD_EULER, boundary
       uu = 0.5*(uold + uold + dt*rhs1 + dt*rhs2)
     elseif (tempSteps == RK4)
       #FIRST Step
-      update_KT(rhs1, uold, N, M,dx, Θ, boundary, order)
+      update_KT(rhs1, uold, N, M,dx, dt, Θ, boundary, order)
       #Second Step
       update_KT(rhs2, uold+dt/2*rhs1, N, M,dx, dt,Θ, boundary, order)
       #Third Step
