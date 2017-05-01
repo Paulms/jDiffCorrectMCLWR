@@ -5,10 +5,10 @@
 # 20% glycerol-rich phase
 
 # Parameters:
-const CFL = 0.5
+const CFL = 0.4
 const Tend = 300 #s
 const L = 20e-3 #m
-const ϕc = 0.0 #TODO: why?
+const ϕc = 0.1 #TODO: why?
 const nn = 4.65 # index of Richardson and Zaki
 const Do = 1e-7 #m²/s
 const ρd = 1090 # kg/m³ dispersed fase (glycerol)
@@ -47,7 +47,7 @@ end
 
 #Function for Entropy C schemes
 function FluxN(ul::Vector, ur::Vector)
-  ut.*ul.*VV.((ul+ur)/2)
+  VV(sum(ur))*ul.*ut
 end
 
 function kvisc(ul::Vector, ur::Vector)
@@ -55,7 +55,7 @@ function kvisc(ul::Vector, ur::Vector)
   K = zeros(M,M)
   C1 = Do * (1-sum((ul+ur)/2))^nn
   for i = 1:M
-    K[i,i] = C1/(ut[i]*ul[i])
+      K[i,i] = C1/(ut[i])
   end
   K
 end
@@ -79,7 +79,7 @@ const M = 8
 const N = 200
 const ϕo = [0, 0.006, 0.018, 0.048, 0.08, 0.042, 0.006, 0]
 dx, xx, uinit = setup_initial(N,M)
-@time uu =  KT(uinit,dx,CFL,Tend, TVD_RK2)
+#@time uu =  KT(uinit,dx,CFL,Tend, TVD_RK2)
 @time uu2 =  entropy_nonconservative(uinit,dx,CFL,Tend, TVD_RK2)
 
 #Plot

@@ -62,5 +62,11 @@ function update_enc(rhs, uold, N, M,dx, dt,  boundary, ϵ, Extra_Viscosity)
     pp[j,:] = 1/dx*(kvisc(uold[j,:],uold[j+1,:])*(uold[j+1,:]-uold[j,:]))
   end
   @boundary_update
-  @update_rhs
+  j = 1 + ss
+  rhs[j-ss,:] = - 1/dx * (ss*hh[j,:] -hhleft - (pp[j,:]-ppleft))
+  for j = (2+ss):(N-1-ss)
+    rhs[j-ss,:] = - 1/dx * (hh[j,:]-hh[j-1,:]-(pp[j,:]-pp[j-1,:]))
+  end
+  j = N-ss
+  rhs[j-ss,:] =  -1/dx*(hhright-ss*hh[j-1,:]-(ppright - pp[j-1,:]))
 end
