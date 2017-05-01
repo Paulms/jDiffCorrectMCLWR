@@ -5,18 +5,18 @@
 # 20% glycerol-rich phase
 
 # Parameters:
-const CFL = 0.25
-const Tend = 5000 #s
+const CFL = 0.5
+const Tend = 300 #s
 const L = 20e-3 #m
 const ϕc = 0.0 #TODO: why?
 const nn = 4.65 # index of Richardson and Zaki
-const Do = 10e-8 #m²/s
+const Do = 1e-7 #m²/s
 const ρd = 1090 # kg/m³ dispersed fase (glycerol)
 const ρc = 880  # kg/m³ continuous fase (biodiesel)
-const gr = 9.81 #m/s²
-const μc = 6.5 # mPa s
+const gr = 9.81 #m/
+const μc = 6.5e-3 # Pa s
 const dd = [2, 23, 34, 50, 70, 100, 150, 200]*1e-6 #m
-const ut = (ρd - ρc)*gr/18*μc*dd.^2
+const ut = (ρd - ρc)*gr/18*μc*dd.^2*1e4
 
 #Functions:
 Flux(ϕ::Vector) = VV(sum(ϕ))*ϕ.*ut
@@ -59,7 +59,7 @@ end
 #Run Test
 include("kt_scheme.jl")
 const M = 8
-const N = 100
+const N = 200
 const ϕo = [0, 0.006, 0.018, 0.048, 0.08, 0.042, 0.006, 0]
 dx, xx, uinit = setup_initial(N,M)
 @time uu =  KT(uinit,dx,CFL,Tend, TVD_RK2)
