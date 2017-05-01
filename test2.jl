@@ -28,7 +28,7 @@ function BB(ϕ::Vector)
     0.0
   else
     M = size(ϕ,1)
-    B = Do*(1-sum(ϕ))^nn*eye(M)
+    Do*(1-sum(ϕ))^nn*eye(M)
   end
 end
 
@@ -44,6 +44,22 @@ function JacF(ϕ::Vector)
   end
   F
 end
+
+#Function for Entropy C schemes
+function FluxN(ul::Vector, ur::Vector)
+  ut.*ul.*VV.((ul+ur)/2)
+end
+
+function kvisc(ul::Vector, ur::Vector)
+  M = size(ul,1)
+  K = zeros(M,M)
+  C1 = Do * (1-sum((ul+ur)/2))^nn
+  for i = 1:M
+    K[i,i] = C1/(ut[i]*ul[i])
+  end
+  K
+end
+
 #Setup initial Conditions
 function setup_initial(N,M)
   # We use ghost cells
@@ -58,16 +74,18 @@ end
 
 #Run Test
 include("kt_scheme.jl")
+include("ec_scheme.jl")
 const M = 8
 const N = 200
 const ϕo = [0, 0.006, 0.018, 0.048, 0.08, 0.042, 0.006, 0]
 dx, xx, uinit = setup_initial(N,M)
 @time uu =  KT(uinit,dx,CFL,Tend, TVD_RK2)
+@time uu2 =  entropy_nonconservative(uinit,dx,CFL,Tend, TVD_RK2)
 
 #Plot
 using(Plots)
 plot(xx, uinit, line=(:dot,2))
 plot(xx, uu, line=(:dot,2))
 plot!(xx, [sum(uu[i,:]) for i=1:N],lab="ϕ")
-#plot(xx, uu2, line=(:dot,2))
-#plot!(xx, [sum(uu2[i,:]) for i=1:N],lab="ϕ")
+plot(xx, uu2, line=(:dot,2))
+plot!(xx, [sum(uu2[i,:]) for i=1:N],lab="ϕ")

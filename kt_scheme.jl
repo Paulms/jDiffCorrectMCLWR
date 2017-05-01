@@ -1,7 +1,4 @@
-using ForwardDiff
-
-@enum StepMethod FORWARD_EULER TVD_RK2 RK4
-@enum BoundaryCondition ZERO_FLUX PERIODIC
+include("schemes_common.jl")
 
 function KT(uinit::AbstractArray,dx,CFL,Tend,tempSteps = FORWARD_EULER, boundary = ZERO_FLUX, Θ = 1, order=2)
   uu = copy(uinit)
@@ -19,24 +16,25 @@ function KT(uinit::AbstractArray,dx,CFL,Tend,tempSteps = FORWARD_EULER, boundary
   while t <= Tend
     uold = copy(uu)
     dt = cdt(uold, CFL, dx)
+    args = [N, M,dx, dt, Θ, boundary, order]
     if (tempSteps == FORWARD_EULER)
-      update_KT(rhs1, uold, N, M, dx, dt,Θ, boundary, order)
+      update_KT(rhs1, uold, N, M,dx, dt, Θ, boundary, order)
       uu = uold + dt*rhs1
     elseif (tempSteps == TVD_RK2)
       #FIRST Step
-      update_KT(rhs1, uold, N, M, dx, dt,Θ, boundary, order)
+      update_KT(rhs1, uold, N, M,dx, dt, Θ, boundary, order)
       #Second Step
-      update_KT(rhs2, uold+dt*rhs1, N, M,dx, dt,Θ, boundary, order)
+      update_KT(rhs2, uold+dt*rhs1, N, M,dx, dt, Θ, boundary, order)
       uu = 0.5*(uold + uold + dt*rhs1 + dt*rhs2)
     elseif (tempSteps == RK4)
       #FIRST Step
-      update_KT(rhs1, uold, N, M,dx, dt, Θ, boundary, order)
+      update_KT(rhs1, uold, N, M,dx, dt,Θ, boundary, order)
       #Second Step
       update_KT(rhs2, uold+dt/2*rhs1, N, M,dx, dt,Θ, boundary, order)
       #Third Step
       update_KT(rhs3, uold+dt/2*rhs2, N, M,dx, dt,Θ, boundary, order)
       #Fourth Step
-      update_KT(rhs4, uold+dt*rhs3, N, M,dx, dt, Θ, boundary, order)
+      update_KT(rhs4, uold+dt*rhs3, N, M,dx, dt,Θ, boundary, order)
       uu = uold + dt/6 * (rhs1+2*rhs2+2*rhs3+rhs4)
     end
     # Print Progress
@@ -59,49 +57,9 @@ function update_KT(rhs, uold, N, M, dx, dt,Θ, boundary, order)
   end
 end
 
-#Flux must be like flux(x::Vector) = x.^2
-Jf = x -> ForwardDiff.jacobian(Flux,x)
-function fluxρ(uj::Vector)
-  #maximum(abs(eigvals(Jf(uj))))
-  maximum(abs(eigvals(JacF(uj))))
-end
-
-function cdt(u::AbstractArray, CFL, dx)
-  maxρ = 0
-  maxρB = 0
-  N = size(u,1)
-  for i in 1:N
-    maxρ = max(maxρ, fluxρ(u[i,:]))
-    maxρB = max(maxρB, maximum(abs(eigvals(BB(u[i,:])))))
-  end
-  CFL/(1/dx*maxρ+1/(2*dx^2)*maxρB)
-end
-
-function minmod(a,b,c)
-  if (a > 0 && b > 0 && c > 0)
-    min(a,b,c)
-  elseif (a < 0 && b < 0 && c < 0)
-    max(a,b,c)
-  else
-    zero(a)
-  end
-end
-function minmod(a,b)
-  0.5*(sign(a)+sign(b))*min(abs(a),abs(b))
-end
-
 function update_KT1(rhs, uold, N, M, dx, boundary)
   # Impose boundary condition
-  ss = 0
-  if boundary == PERIODIC
-    ss = 1
-    N = N + 2   #Create ghost cells
-    utemp = copy(uold)
-    uold = zeros(N,M)
-    uold[2:N-1,:] = utemp
-    uold[1,:] = utemp[N-2,:]
-    uold[N,:] = utemp[1,:]
-  end
+  @boundary_header
   # Slope vector
   ∇u = zeros(N,M)
   for j = 2:N-1
@@ -125,34 +83,13 @@ function update_KT1(rhs, uold, N, M, dx, boundary)
   for j = 1:N-1
     pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]
   end
-  hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
-  if boundary == PERIODIC
-    hhleft = hh[1,:]; ppleft = pp[1,:]
-    hhright = hh[N-1,:]; ppright = pp[N-1,:]
-  end
-
-  j = 1 + ss
-  rhs[j-ss,:] = - 1/dx * (hh[j,:] -hhleft - (pp[j,:]-ppleft))
-  for j = (2+ss):(N-1-ss)
-    rhs[j-ss,:] = - 1/dx * (hh[j,:]-hh[j-1,:]-(pp[j,:]-pp[j-1,:]))
-  end
-  j = N-ss
-  rhs[j-ss,:] =  -1/dx*(hhright-hh[j-1,:]-(ppright - pp[j-1,:]))
+  @boundary_update
+  @update_rhs
 end
 
 
 function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
-  ss = 0
-  if boundary == PERIODIC
-    ss = 1
-    N = N + 2   #Create ghost cells
-    utemp = copy(uold)
-    uold = zeros(N,M)
-    uold[2:N-1,:] = utemp
-    uold[1,:] = utemp[N-2,:]
-    uold[N,:] = utemp[1,:]
-  end
-
+  @boundary_header
   #Compute diffusion
   λ = dt/dx
   #update vector
@@ -234,16 +171,6 @@ function update_KT2(rhs, uold, N, M, dx, dt,Θ, boundary)
   for j = 1:N-1
     pp[j,:] = 0.5*(BB(uold[j+1,:])+BB(uold[j,:]))*∇u_ap[j,:]
   end
-  hhleft = 0; hhright = 0; ppleft = 0; ppright = 0
-  if boundary == PERIODIC
-    hhleft = hh[1,:]; ppleft = pp[1,:]
-    hhright = hh[N-1,:]; ppright = pp[N-1,:]
-  end
-  j = 1 + ss
-  rhs[j-ss,:] = - 1/dx * (hh[j,:] -hhleft - (pp[j,:]-ppleft))
-  for j = (2+ss):(N-1-ss)
-    rhs[j-ss,:] = - 1/dx * (hh[j,:]-hh[j-1,:]-(pp[j,:]-pp[j-1,:]))
-  end
-  j = N-ss
-  rhs[j-ss,:] =  -1/dx*(hhright-hh[j-1,:]-(ppright - pp[j-1,:]))
+  @boundary_update
+  @update_rhs
 end
